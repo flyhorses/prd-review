@@ -2,6 +2,7 @@ package prd.guide.modules.knowledgebase.service;
 
 import prd.guide.common.exception.BusinessException;
 import prd.guide.common.exception.ErrorCode;
+import prd.guide.common.security.SecurityUtils;
 import prd.guide.modules.knowledgebase.model.KnowledgeBaseEntity;
 import prd.guide.modules.knowledgebase.model.VectorStatus;
 import prd.guide.modules.knowledgebase.repository.KnowledgeBaseRepository;
@@ -13,10 +14,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
-/**
- * 知识库持久化服务
- * 处理所有需要事务的数据库操作
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -24,24 +21,19 @@ public class KnowledgeBasePersistenceService {
 
     private final KnowledgeBaseRepository knowledgeBaseRepository;
 
-    /**
-     * 处理重复知识库（更新访问计数）
-     */
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> handleDuplicateKnowledgeBase(KnowledgeBaseEntity kb, String fileHash) {
         log.info("检测到重复知识库，返回已有记录: kbId={}", kb.getId());
         
-        // 更新访问计数（在事务中）
         kb.incrementAccessCount();
         knowledgeBaseRepository.save(kb);
         
-        // 重复知识库的向量数据应该已经存在，不需要重新向量化
         return Map.of(
             "knowledgeBase", Map.of(
                 "id", kb.getId(),
                 "name", kb.getName(),
                 "fileSize", kb.getFileSize(),
-                "contentLength", 0  // 不再存储content，所以长度为0
+                "contentLength", 0
             ),
             "storage", Map.of(
                 "fileKey", kb.getStorageKey() != null ? kb.getStorageKey() : "",
@@ -51,14 +43,12 @@ public class KnowledgeBasePersistenceService {
         );
     }
 
-    /**
-     * 保存新知识库元数据到数据库
-     */
     @Transactional(rollbackFor = Exception.class)
     public KnowledgeBaseEntity saveKnowledgeBase(MultipartFile file, String name, String category,
                                                   String storageKey, String storageUrl, String fileHash) {
         try {
             KnowledgeBaseEntity kb = new KnowledgeBaseEntity();
+            kb.setUserId(getCurrentUserId());
             kb.setFileHash(fileHash);
             kb.setName(name != null && !name.trim().isEmpty() ? name : extractNameFromFilename(file.getOriginalFilename()));
             kb.setCategory(category != null && !category.trim().isEmpty() ? category.trim() : null);
@@ -69,7 +59,8 @@ public class KnowledgeBasePersistenceService {
             kb.setStorageUrl(storageUrl);
 
             KnowledgeBaseEntity saved = knowledgeBaseRepository.save(kb);
-            log.info("知识库已保存: id={}, name={}, category={}, hash={}", saved.getId(), saved.getName(), saved.getCategory(), fileHash);
+            log.info("知识库已保存: id={}, userId={}, name={}, category={}, hash={}", 
+                saved.getId(), saved.getUserId(), saved.getName(), saved.getCategory(), fileHash);
             return saved;
         } catch (Exception e) {
             log.error("保存知识库失败: {}", e.getMessage(), e);
@@ -77,9 +68,6 @@ public class KnowledgeBasePersistenceService {
         }
     }
 
-    /**
-     * 更新知识库向量化状态为 PENDING
-     */
     @Transactional(rollbackFor = Exception.class)
     public void updateVectorStatusToPending(Long kbId) {
         KnowledgeBaseEntity kb = knowledgeBaseRepository.findById(kbId)
@@ -92,9 +80,6 @@ public class KnowledgeBasePersistenceService {
         log.info("知识库向量化状态已更新为 PENDING: kbId={}", kbId);
     }
 
-    /**
-     * 从文件名提取知识库名称（去除扩展名）
-     */
     private String extractNameFromFilename(String filename) {
         if (filename == null || filename.isEmpty()) {
             return "未命名知识库";
@@ -105,5 +90,12 @@ public class KnowledgeBasePersistenceService {
         }
         return filename;
     }
-}
 
+    private Long getCurrentUserId() {
+        Long userId = SecurityUtils.getCurrentUserId();
+        if (userId == null) {
+            log.warn("无法获取当前用户ID，使用默认值");
+        }
+        return userId;
+    }
+}

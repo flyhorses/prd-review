@@ -8,3 +8,13 @@ export type {
   AsyncTaskStatus 
 } from './prdReview';
 export { knowledgeBaseApi } from './knowledgebase';
+export { userApi } from './user';
+export type { 
+  User, 
+  UserStatus, 
+  UserRole, 
+  UserRegisterRequest, 
+  UserLoginRequest, 
+  UserUpdateRequest, 
+  UserStatusUpdateRequest 
+} from './user';

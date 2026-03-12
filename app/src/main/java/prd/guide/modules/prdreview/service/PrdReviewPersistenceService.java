@@ -3,6 +3,7 @@ package prd.guide.modules.prdreview.service;
 import prd.guide.common.exception.BusinessException;
 import prd.guide.common.exception.ErrorCode;
 import prd.guide.common.model.AsyncTaskStatus;
+import prd.guide.common.security.SecurityUtils;
 import prd.guide.modules.prdreview.model.PrdPreprocessResult;
 import prd.guide.modules.prdreview.model.PrdReviewEntity;
 import prd.guide.modules.prdreview.model.PrdReviewRequest;
@@ -17,9 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * PRD 评审结果持久化服务
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -28,31 +26,27 @@ public class PrdReviewPersistenceService {
     private final PrdReviewRepository reviewRepository;
     private final ObjectMapper objectMapper;
 
-    /**
-     * 创建一个 PENDING 状态的 PRD 记录（用于异步处理）
-     */
     @Transactional(rollbackFor = Exception.class)
     public PrdReviewEntity createPendingRecord(PrdReviewRequest request) {
         PrdReviewEntity entity = new PrdReviewEntity();
+        entity.setUserId(getCurrentUserId());
         entity.setTitle(request.title());
         entity.setOriginalContent(request.content());
         entity.setDetailLevel(request.detailLevel() != null ? request.detailLevel() : ReviewDetailLevel.BASIC);
         entity.setReviewStatus(AsyncTaskStatus.PENDING);
 
         PrdReviewEntity saved = reviewRepository.save(entity);
-        log.info("PRD 评审记录已创建（待处理）: id={}", saved.getId());
+        log.info("PRD 评审记录已创建（待处理）: id={}, userId={}", saved.getId(), saved.getUserId());
         return saved;
     }
 
-    /**
-     * 保存一次 PRD 评审结果
-     */
     @Transactional(rollbackFor = Exception.class)
     public PrdReviewEntity saveReview(PrdReviewRequest request,
                                       PrdPreprocessResult preprocessResult,
                                       PrdReviewResponse response) {
         try {
             PrdReviewEntity entity = new PrdReviewEntity();
+            entity.setUserId(getCurrentUserId());
             entity.setTitle(request.title());
             entity.setOriginalContent(request.content());
             entity.setCleanedContent(preprocessResult.cleanedContent());
@@ -61,7 +55,7 @@ public class PrdReviewPersistenceService {
             entity.setReviewStatus(AsyncTaskStatus.COMPLETED);
 
             PrdReviewEntity saved = reviewRepository.save(entity);
-            log.info("PRD 评审结果已保存: id={}", saved.getId());
+            log.info("PRD 评审结果已保存: id={}, userId={}", saved.getId(), saved.getUserId());
             return saved;
         } catch (JacksonException e) {
             log.error("序列化 PRD 评审结果失败", e);
@@ -69,9 +63,6 @@ public class PrdReviewPersistenceService {
         }
     }
 
-    /**
-     * 根据ID获取历史评审结果
-     */
     @Transactional(readOnly = true)
     public PrdReviewResponse findReviewResponseById(Long id) {
         PrdReviewEntity entity = reviewRepository.findById(id)
@@ -89,34 +80,26 @@ public class PrdReviewPersistenceService {
         }
     }
 
-    /**
-     * 根据ID获取评审实体（包含状态信息）
-     */
     @Transactional(readOnly = true)
     public PrdReviewEntity findEntityById(Long id) {
         return reviewRepository.findById(id)
             .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "PRD 评审记录不存在"));
     }
 
-    /**
-     * 保存评审实体
-     */
     @Transactional(rollbackFor = Exception.class)
     public PrdReviewEntity save(PrdReviewEntity entity) {
         return reviewRepository.save(entity);
     }
 
-    /**
-     * 获取所有评审记录（按创建时间倒序）
-     */
     @Transactional(readOnly = true)
     public List<PrdReviewEntity> findAllByOrderByCreatedAtDesc() {
+        Long userId = getCurrentUserId();
+        if (userId != null) {
+            return reviewRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        }
         return reviewRepository.findAllByOrderByCreatedAtDesc();
     }
 
-    /**
-     * 删除评审记录
-     */
     @Transactional(rollbackFor = Exception.class)
     public void deleteById(Long id) {
         if (!reviewRepository.existsById(id)) {
@@ -126,9 +109,6 @@ public class PrdReviewPersistenceService {
         log.info("PRD 评审记录已删除: id={}", id);
     }
 
-    /**
-     * 更新评审状态
-     */
     @Transactional(rollbackFor = Exception.class)
     public void updateReviewStatus(Long prdId, AsyncTaskStatus status, String error) {
         reviewRepository.findById(prdId).ifPresent(entity -> {
@@ -139,9 +119,6 @@ public class PrdReviewPersistenceService {
         });
     }
 
-    /**
-     * 更新评审结果
-     */
     @Transactional(rollbackFor = Exception.class)
     public void updateReviewResult(Long prdId, String cleanedContent, 
                                    ReviewDetailLevel detailLevel, PrdReviewResponse response) {
@@ -159,5 +136,12 @@ public class PrdReviewPersistenceService {
             }
         });
     }
-}
 
+    private Long getCurrentUserId() {
+        Long userId = SecurityUtils.getCurrentUserId();
+        if (userId == null) {
+            log.warn("无法获取当前用户ID，使用默认值");
+        }
+        return userId;
+    }
+}

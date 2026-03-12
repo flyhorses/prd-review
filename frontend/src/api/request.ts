@@ -17,6 +17,36 @@ const instance: AxiosInstance = axios.create({
 });
 
 /**
+ * 请求拦截器
+ * 
+ * 约定：登录后 token 存在 localStorage.token 中
+ * - 自动附加 Authorization: Bearer <token>
+ */
+instance.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    const headers = (config.headers || {}) as Record<string, unknown>;
+    if (!headers.Authorization) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    config.headers = headers as any;
+  }
+  return config;
+});
+
+function handleUnauthenticated() {
+  // 统一登出：清理本地登录态并跳转登录页
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+
+  // 避免在登录页死循环刷新
+  if (window.location.pathname !== '/login') {
+    const from = encodeURIComponent(window.location.pathname + window.location.search + window.location.hash);
+    window.location.href = `/login?from=${from}`;
+  }
+}
+
+/**
  * 响应拦截器
  * 
  * 后端约定：所有响应都是 HTTP 200 + Result
@@ -29,6 +59,11 @@ instance.interceptors.response.use(
     
     // 检查是否是 Result 格式
     if (result && typeof result === 'object' && 'code' in result) {
+      // 未登录/无权限：统一处理（兼容后端用 401/403 作为业务 code 的情况）
+      if (result.code === 401 || result.code === 403) {
+        handleUnauthenticated();
+        return Promise.reject(new Error(result.message || '未登录或无权限'));
+      }
       if (result.code === 200) {
         // 成功：返回 data
         response.data = result.data;
@@ -44,10 +79,20 @@ instance.interceptors.response.use(
   (error) => {
     // 有响应的情况：后端返回了结果（即使是错误）
     if (error.response) {
+      // HTTP 401/403：统一登出处理
+      if (error.response.status === 401 || error.response.status === 403) {
+        handleUnauthenticated();
+        return Promise.reject(new Error('未登录或无权限'));
+      }
+
       const { data } = error.response;
       // 尝试解析 Result 格式
       if (data && typeof data === 'object' && 'code' in data && 'message' in data) {
         const result = data as Result;
+        if (result.code === 401 || result.code === 403) {
+          handleUnauthenticated();
+          return Promise.reject(new Error(result.message || '未登录或无权限'));
+        }
         return Promise.reject(new Error(result.message || '请求失败'));
       }
       // 响应格式不对

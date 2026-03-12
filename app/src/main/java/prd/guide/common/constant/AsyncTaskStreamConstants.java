@@ -102,4 +102,61 @@ public final class AsyncTaskStreamConstants {
      * 知识库ID列表字段（JSON格式）
      */
     public static final String FIELD_KB_IDS = "kbIds";
+
+    // ========== 用户模块 Stream 配置 ==========
+
+    /**
+     * 用户模块 Stream Key
+     */
+    public static final String USER_STREAM_KEY = "user:sync:stream";
+
+    /**
+     * 用户模块 Consumer Group 名称
+     */
+    public static final String USER_GROUP_NAME = "user-sync-group";
+
+    /**
+     * 用户模块 Consumer 名称前缀
+     */
+    public static final String USER_CONSUMER_PREFIX = "user-sync-consumer-";
+
+    /**
+     * 用户ID字段
+     */
+    public static final String FIELD_USER_ID = "userId";
+
+    /**
+     * 用户操作类型字段
+     */
+    public static final String FIELD_USER_ACTION = "action";
+
+    /**
+     * 用户名字段
+     */
+    public static final String FIELD_USERNAME = "username";
+
+    /**
+     * 用户邮箱字段
+     */
+    public static final String FIELD_USER_EMAIL = "email";
+
+    /**
+     * 用户昵称字段
+     */
+    public static final String FIELD_USER_NICKNAME = "nickname";
+
+    /**
+     * 用户头像字段
+     */
+    public static final String FIELD_USER_AVATAR = "avatar";
+
+    /**
+     * 用户状态字段
+     */
+    public static final String FIELD_USER_STATUS = "status";
+
+    /**
+     * 用户角色字段
+     */
+    public static final String FIELD_USER_ROLE = "role";
 }

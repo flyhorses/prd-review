@@ -9,7 +9,6 @@ spring:
     name: prd-review-platform
 
   # 启用虚拟线程 (Java 21+)
-  # 显著提升 I/O 密集型场景的并发能力，特别适合 AI 调用和 SSE 长连接
   threads:
     virtual:
       enabled: true
@@ -30,14 +29,14 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
         jdbc.lob.non_contextual_creation: true
+
   servlet:
     multipart:
       enabled: true
       max-file-size: 50MB
       max-request-size: 50MB
-  
 
-  # Redisson配置 (使用 spring.redis.redisson，参考官方文档)
+  # Redisson配置
   redis:
     redisson:
       config: |
@@ -48,7 +47,7 @@ spring:
           connectionPoolSize: 64
           subscriptionConnectionMinimumIdleSize: 1
           subscriptionConnectionPoolSize: 50
-  
+
   # Spring AI - 阿里云DashScope (OpenAI兼容模式)
   ai:
     openai:
@@ -58,15 +57,12 @@ spring:
         options:
           model: ${AI_MODEL}
           temperature: 0.2
-      # Embedding模型配置 - 使用text-embedding-v3
       embedding:
         options:
           model: text-embedding-v3
-    # 禁用自动重试机制，让异常立即返回
     retry:
       max-attempts: 1
       on-client-errors: false
-    # PostgreSQL Vector Store配置
     vectorstore:
       pgvector:
         index-type: HNSW
@@ -77,10 +73,11 @@ spring:
 
 # Application custom configuration
 app:
+  jwt:
+    secret: ${APP_JWT_SECRET:prd-review-platform-jwt-secret-key-must-be-at-least-256-bits-long-for-security}
+    expiration: ${APP_JWT_EXPIRATION:86400000}
   ai:
-    # 结构化输出重试次数（用于 BeanOutputConverter 解析失败时的业务层重试）
     structured-max-attempts: ${APP_AI_STRUCTURED_MAX_ATTEMPTS:2}
-    # 重试时是否将上次错误原因注入提示词，帮助模型定向修复输出
     structured-include-last-error: ${APP_AI_STRUCTURED_INCLUDE_LAST_ERROR:true}
     rag:
       rewrite:
@@ -96,14 +93,12 @@ app:
     max-content-length: ${APP_PRD_MAX_CONTENT_LENGTH:100000}
     default-detail-level: ${APP_PRD_DEFAULT_DETAIL_LEVEL:BASIC}
 
-  # RustFS (S3兼容) 存储配置
   storage:
     endpoint: ${APP_STORAGE_ENDPOINT:http://localhost:9000}
     access-key: ${APP_STORAGE_ACCESS_KEY}
     secret-key: ${APP_STORAGE_SECRET_KEY}
     bucket: ${APP_STORAGE_BUCKET:prd}
     region: ${APP_STORAGE_REGION:us-east-1}
-  
-  # CORS配置 - React前端
+
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:80}

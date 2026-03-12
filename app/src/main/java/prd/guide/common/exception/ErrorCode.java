@@ -17,6 +17,7 @@ public enum ErrorCode {
     FORBIDDEN(403, "禁止访问"),
     NOT_FOUND(404, "资源不存在"),
     INTERNAL_ERROR(500, "服务器内部错误"),
+    VALIDATION_ERROR(400, "数据验证失败"),
     
     // ========== PRD 评审模块错误 2xxx ==========
     PRD_REVIEW_NOT_FOUND(2001, "PRD 评审记录不存在"),
